@@ -42,10 +42,11 @@ COPY --chown=node:node .yarn ./.yarn
 COPY --chown=node:node .yarnrc.yml ./
 
 # This switches many Node.js dependencies to production mode.
-ENV NODE_ENV=production
+# ENV NODE_ENV=production
+ENV NODE_ENV=development
 
 # This disables node snapshot for Node 20 to work with the Scaffolder
-ENV NODE_OPTIONS "--no-node-snapshot"
+ENV NODE_OPTIONS="--no-node-snapshot"
 
 # Copy repo skeleton first, to avoid unnecessary docker cache invalidation.
 # The skeleton contains the package.json of each package in the monorepo,
