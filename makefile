@@ -16,13 +16,18 @@ minikube-delete:
 	@echo " Minikube - Deleting ..."
 	@minikube delete
 
-.PHONY: check-minikube
-check-minikube: minikube-start
+.PHONY: minikube-check
+minikube-check: minikube-start
 	@echo "Minikube - Checking if is ready..."
 	@minikube status | grep -q "host: Running" && minikube status | grep -q "kubelet: Running" && minikube status | grep -q "apiserver: Running" || { \
 		echo "Minikube is not ready. Please ensure Minikube is running before executing this task."; \
 		exit 1; \
 	}
+	
+.PHONY: minikube-config
+minikube-config: minikube-check
+	@echo "Minikube - Applying configuration"
+	@kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.0/cert-manager.yaml
 
 # Backstage
 .PHONY: backstage-build-image
@@ -59,7 +64,7 @@ ARGOCD_BACKSTAGE_USER := backstage
 ARGOCD_BACKSTAGE_PASSWORD := backstage 
 
 .PHONY: argocd-install
-argocd-install: check-minikube
+argocd-install: minikube-check
 	@echo "ArgoCD - Installing ..."
 
 	@echo "ArgoCD - Creating namespace ..."
@@ -132,4 +137,4 @@ gitlab-install:
 	@echo "GitLab - Installation complete. Access it via: http://gitlab.$(minikube ip).nip.io"
 
 .PHONY: run
-run: minikube-start backstage-build-image backstage-install
+run: minikube-start minikube-config backstage-build-image backstage-install
