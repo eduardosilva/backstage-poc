@@ -1,0 +1,232 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backstage
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secrets
+  namespace: backstage
+type: Opaque
+data:
+  POSTGRES_USER: YmFja3N0YWdl # hangar
+  POSTGRES_PASSWORD: YmFja3N0YWdl # hangar
+---
+#apiVersion: storage.k8s.io/v1
+#kind: StorageClass
+#metadata:
+#  name: cinder-storageclass-5k
+#parameters:
+#  availability: nova
+#  type: cloud_nvme5k
+#provisioner: cinder.csi.openstack.org
+#reclaimPolicy: Delete
+#volumeBindingMode: Immediate
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: my-pvc
+#spec:
+#  accessModes:
+#    - ReadWriteOnce
+#  storageClassName: cinder-storageclass-5k
+#  resources:
+#    requests:
+#      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-storage-claim
+  namespace: backstage
+  labels:
+    type: local
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: cinder-storageclass
+  resources:
+    requests:
+      storage: 2Gi
+---
+#apiVersion: v1
+#kind: PersistentVolume
+#metadata:
+#  name: postgres-storage
+#  namespace: backstage
+#  labels:
+#    type: local
+#spec:
+#  storageClassName: manual
+#  capacity:
+#    storage: 2Gi
+#  accessModes:
+#    - ReadWriteOnce
+#  persistentVolumeReclaimPolicy: Retain
+#  hostPath:
+#    path: '/mnt/data'
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: postgres-storage-claim
+#  namespace: backstage
+#spec:
+#  storageClassName: manual
+#  accessModes:
+#    - ReadWriteOnce
+#  resources:
+#    requests:
+#      storage: 2Gi
+#---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: backstage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:13.2-alpine
+          imagePullPolicy: 'IfNotPresent'
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-secrets
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgresdb
+              subPath: data
+      volumes:
+        - name: postgresdb
+          persistentVolumeClaim:
+            claimName: postgres-storage-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: backstage
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      containers:
+        - name: backstage
+          image: mateusmsouza4/backstage:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7007
+          envFrom:
+            - secretRef:
+                name: postgres-secrets
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres"  
+            - name: POSTGRES_PORT
+              value: "5432" 
+            - name: NODE_ENV # TEMP TO FIX AUTH PLUGIN ERROR https://backstage.io/docs/auth/troubleshooting/#sign-in-fails-with--provider-is-not-configured-to-support-sign-in
+              value: "development"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_PASSWORD
+            # - secretRef:
+            #     name: backstage-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  type: NodePort
+  selector:
+    app: backstage
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30081
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: backstage-cert
+  namespace: backstage  
+spec:
+  secretName: backstage-tls  
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer
+  commonName: 201.23.19.210.nip.io  
+  dnsNames:
+    - 201.23.19.210.nip.io  
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backstage-ingress
+  namespace: backstage
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  tls:
+    - hosts:
+        - 201.23.19.210.nip.io  
+      secretName: backstage-tls  
+  rules:
+    - host: 201.23.19.210.nip.io  
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backstage  
+                port:
+                  number: 80  

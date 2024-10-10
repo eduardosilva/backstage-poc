@@ -23,7 +23,6 @@
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
     "new": "backstage-cli new --scope internal",
-    
     "clean:mods": "find . -type d -name 'node_modules' -print0 | xargs -0 rm -rf",
     "reinstall": "yarn clean:mods && yarn install",
     "docker": "yarn clean && yarn build:all && yarn build-image && docker run -p 7007:7007 backstage",
