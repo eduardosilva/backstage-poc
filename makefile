@@ -30,18 +30,20 @@ minikube-config: minikube-check
 	@kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.0/cert-manager.yaml
 
 # Backstage
+BACKSTAGE_TAG := backstage:1.0.0
+
 .PHONY: backstage-build-image
 backstage-build-image:
 	@echo "Backstage - Building image ..."
 	@yarn install --frozen-lockfile
 	@yarn tsc
 	@yarn build:backend --config ../../app-config.yaml
-	@docker image build . -f packages/backend/Dockerfile --tag mateusmsouza4/backstage:1.0.2
+	@docker image build . -f packages/backend/Dockerfile --tag $(BACKSTAGE_TAG)
 
 .PHONY: backstage-install
 backstage-install:
 	@echo "Backstage - Installing..."
-	@minikube image load backstage:1.0.0
+	@minikube image load $(BACKSTAGE_TAG)
 	@echo "Backstage - Creating data folder ..."
 	@minikube ssh -- "sudo mkdir -p /mnt/data"
 
@@ -49,6 +51,13 @@ backstage-install:
 	# @kubectl apply -f kubernetes/backstage-config.yaml
 	@minikube_ip=$$(minikube ip) && \
 	sed "s/MINIKUBE_IP/$${minikube_ip}/g" iac/manifest.yml | kubectl apply -f -
+
+	@kubectl create configmap backstage-config \
+	  --from-file=app-config.yaml=app-config.yaml \
+	  --from-file=app-config.production.yaml=app-config.production.yaml \
+	  --namespace=backstage \
+	  --dry-run=client -o yaml | kubectl apply -f -
+
 
 .PHONY: backstage-open
 backstage-open:

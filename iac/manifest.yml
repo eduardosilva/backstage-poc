@@ -1,24 +1,44 @@
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: selfsigned-issuer
-spec:
-  selfSigned: {}
----
 apiVersion: v1
 kind: Namespace
 metadata:
   name: backstage
+  labels:
+    purpose: backstage-app
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: backstage 
+spec:
+  selfSigned: {}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: postgres-secrets
   namespace: backstage
+  labels:
+    app: postgres 
 type: Opaque
 data:
-  POSTGRES_USER: YmFja3N0YWdl # hangar
-  POSTGRES_PASSWORD: YmFja3N0YWdl # hangar
+  POSTGRES_USER: YmFja3N0YWdl # base64 encoded value for 'backstage'
+  POSTGRES_PASSWORD: YmFja3N0YWdl # base64 encoded value for 'backstage'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-storage-claim
+  namespace: backstage
+  labels:
+    app: postgres 
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -27,6 +47,7 @@ metadata:
   namespace: backstage
   labels:
     type: local
+    app: postgres 
 spec:
   storageClassName: manual
   capacity:
@@ -36,19 +57,6 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   hostPath:
     path: '/mnt/data'
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgres-storage-claim
-  namespace: backstage
-spec:
-  storageClassName: manual
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -94,6 +102,13 @@ spec:
   ports:
     - port: 5432
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-config
+  namespace: backstage
+data: {}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -111,7 +126,7 @@ spec:
     spec:
       containers:
         - name: backstage
-          image: backstage:1.0.1
+          image: backstage:1.0.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -138,6 +153,14 @@ spec:
                   key: POSTGRES_PASSWORD
             # - secretRef:
             #     name: backstage-secrets
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config  
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: backstage-config
 ---
 apiVersion: v1
 kind: Service
@@ -145,14 +168,13 @@ metadata:
   name: backstage
   namespace: backstage
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: backstage
   ports:
     - name: http
       port: 80
       targetPort: http
-      nodePort: 30080
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -167,7 +189,6 @@ spec:
   commonName: MINIKUBE_IP.nip.io  
   dnsNames:
     - MINIKUBE_IP.nip.io  
----
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

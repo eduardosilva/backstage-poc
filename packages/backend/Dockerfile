@@ -60,8 +60,11 @@ RUN --mount=type=cache,target=/home/node/.cache/yarn,sharing=locked,uid=1000,gid
 # This will include the examples, if you don't need these simply remove this line
 COPY --chown=node:node examples ./examples
 
-# Then copy the rest of the backend bundle, along with any other files we might want.
-COPY --chown=node:node packages/backend/dist/bundle.tar.gz app-config*.yaml ./
+# Then copy the rest of the backend bundle
+COPY  packages/backend/dist/bundle.tar.gz ./
+
+# Then copy the config files
+COPY --chown=node:node app-config*.yaml ./config/
 RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
 
-CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.production.yaml"]
+CMD ["node", "packages/backend", "--config", "config/app-config.yaml", "--config", "config/app-config.production.yaml"]
