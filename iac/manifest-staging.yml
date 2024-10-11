@@ -150,7 +150,7 @@ spec:
     spec:
       containers:
         - name: backstage
-          image: mateusmsouza4/backstage:1.0.1
+          image: mateusmsouza4/backstage:1.0.2
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -160,7 +160,7 @@ spec:
                 name: postgres-secrets
           env:
             - name: BASE_URL
-              value: "http://201.23.16.85"
+              value: "http://201.23.16.85:80"
             - name: PORT
               value: "7007"
             - name: POSTGRES_HOST
