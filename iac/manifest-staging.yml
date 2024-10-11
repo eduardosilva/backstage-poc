@@ -150,7 +150,7 @@ spec:
     spec:
       containers:
         - name: backstage
-          image: mateusmsouza4/backstage:1.0.0
+          image: mateusmsouza4/backstage:1.0.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -159,6 +159,10 @@ spec:
             - secretRef:
                 name: postgres-secrets
           env:
+            - name: BASE_URL
+              value: "http://201.23.16.85"
+            - name: PORT
+              value: "7007"
             - name: POSTGRES_HOST
               value: "postgres"  
             - name: POSTGRES_PORT
@@ -184,14 +188,19 @@ metadata:
   name: backstage
   namespace: backstage
 spec:
-  type: NodePort
+  type: LoadBalancer
   selector:
     app: backstage
   ports:
-    - name: http
-      port: 80
-      targetPort: http
+    - port: 80
+      targetPort: 7007 #7007
+      protocol: TCP
       nodePort: 30081
+    #- name: http
+    #  port: 80
+    #  targetPort: http
+    #  nodePort: 30081
+    #  protocol: TCP
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

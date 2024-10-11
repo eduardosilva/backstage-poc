@@ -36,7 +36,7 @@ backstage-build-image:
 	@yarn install --frozen-lockfile
 	@yarn tsc
 	@yarn build:backend --config ../../app-config.yaml
-	@docker image build . -f packages/backend/Dockerfile --tag mateusmsouza4/backstage:1.0.0
+	@docker image build . -f packages/backend/Dockerfile --tag mateusmsouza4/backstage:1.0.1
 
 .PHONY: backstage-install
 backstage-install:
